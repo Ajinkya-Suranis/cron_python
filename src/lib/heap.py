@@ -42,10 +42,28 @@ class heap:
             self.heap_items[parent_index], self.heap_items[current_index] = \
                 self.heap_items[current_index], self.heap_items[parent_index]
 
-    def remove_min(self, item):
-        if not self.heap_items or self.search_heap(item) == False:
-            return
-        self.heap_items.pop(0)
+    def remove_min(self):
+        if not self.heap_items:
+            return None
+        if self.heap_nitems in [1, 2]:
+            self.heap_nitems -= 1
+            return self.heap_items.pop(0)
+        min_item = self.heap_items[0]
+        self.heap_items[0] = self.heap_items.pop()
         self.heap_nitems -= 1
-        if self.heap_nitems in [0, 1]:
-            return
+        parent_index = 0
+        while True:
+            lchild_index = (parent_index << 1) + 1
+            rchild_index = lchild_index + 1
+            if lchild_index >= self.heap_nitems:
+                break
+            min_index = lchild_index if rchild_index >= self.heap_nitems or \
+                            self.heap_items[lchild_index] < self.heap_items[rchild_index] \
+                            else rchild_index
+            if self.heap_items[min_index] < self.heap_items[parent_index]:
+                self.heap_items[parent_index], self.heap_items[min_index] = \
+                        self.heap_items[min_index], self.heap_items[parent_index]
+                parent_index = min_index
+            else:
+                break
+        return min_item
