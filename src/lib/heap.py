@@ -1,19 +1,22 @@
 class heap:
-    def __init__(self):
+    def __init__(self, key):
         self.heap_items = []
         self.heap_nitems = 0
+        self.key = key
 
     def _search_heap(self, item, index=0):
         if index >= self.heap_nitems:
             return False
-        if self.heap_items[index] == item:
+        if self.heap_items[index][self.key] == item[self.key]:
             return True
         lchild_index = (index << 1) + 1
         rchild_index = lchild_index + 1
-        if lchild_index < self.heap_nitems and self.heap_items[lchild_index] <= item:
+        if lchild_index < self.heap_nitems and \
+                self.heap_items[lchild_index][self.key] <= item[self.key]:
             if self._search_heap(item, lchild_index) == True:
                 return True
-        if rchild_index < self.heap_nitems and self.heap_items[rchild_index] <= item:
+        if rchild_index < self.heap_nitems and \
+                self.heap_items[rchild_index][self.key] <= item[self.key]:
             return self._search_heap(item, rchild_index)
         return False
 
@@ -37,10 +40,11 @@ class heap:
         while True:
             current_index = parent_index
             parent_index = (current_index >> 1) - 1 if current_index % 2 == 0 else current_index >> 1
-            if parent_index < 0 or self.heap_items[parent_index] < self.heap_items[current_index]:
+            if parent_index < 0 or self.heap_items[parent_index][self.key] < \
+                    self.heap_items[current_index][self.key]:
                 break
-            self.heap_items[parent_index], self.heap_items[current_index] = \
-                self.heap_items[current_index], self.heap_items[parent_index]
+            self.heap_items[parent_index][self.key], self.heap_items[current_index][self.key] = \
+                self.heap_items[current_index][self.key], self.heap_items[parent_index][self.key]
 
     def remove_min(self):
         if not self.heap_items:
@@ -55,14 +59,15 @@ class heap:
         while True:
             lchild_index = (parent_index << 1) + 1
             rchild_index = lchild_index + 1
-            if lchild_index >= self.heap_nitems:
+            if lchild_index[self.key] >= self.heap_nitems:
                 break
             min_index = lchild_index if rchild_index >= self.heap_nitems or \
-                            self.heap_items[lchild_index] < self.heap_items[rchild_index] \
+                            self.heap_items[lchild_index][self.key] < \
+                            self.heap_items[rchild_index][self.key] \
                             else rchild_index
-            if self.heap_items[min_index] < self.heap_items[parent_index]:
-                self.heap_items[parent_index], self.heap_items[min_index] = \
-                        self.heap_items[min_index], self.heap_items[parent_index]
+            if self.heap_items[min_index][self.key] < self.heap_items[parent_index][self.key]:
+                self.heap_items[parent_index][self.key], self.heap_items[min_index][self.key] = \
+                        self.heap_items[min_index][self.key], self.heap_items[parent_index][self.key]
                 parent_index = min_index
             else:
                 break
