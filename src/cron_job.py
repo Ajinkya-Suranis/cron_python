@@ -17,7 +17,7 @@ class cron_job:
         self.next_time = int(time.time())
         self.next_time = self.get_next_time()
 
-    def _get_diff(unit_value):
+    def _get_diff(self, unit_value):
         ltime = time.localtime(self.next_time)
         if unit_value == "minutes":
             val = ltime.tm_min
@@ -46,7 +46,7 @@ class cron_job:
     def get_next_time(self):
         self.next_time = self.next_time + 60
         for unit in self.schedule_units:
-            done, diff = get_diff(self.next_time, unit)
+            done, diff = self._get_diff(unit)
             self.next_time += diff
             if done:
                 return self.next_time

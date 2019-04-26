@@ -2,6 +2,7 @@ class heap:
     def __init__(self, key):
         self.heap_items = []
         self.heap_nitems = 0
+        self.heap_current_min = None
         self.key = key
 
     def _search_heap(self, item, index=0):
@@ -43,8 +44,14 @@ class heap:
             if parent_index < 0 or self.heap_items[parent_index][self.key] < \
                     self.heap_items[current_index][self.key]:
                 break
-            self.heap_items[parent_index][self.key], self.heap_items[current_index][self.key] = \
-                self.heap_items[current_index][self.key], self.heap_items[parent_index][self.key]
+            self.heap_items[parent_index], self.heap_items[current_index] = \
+                self.heap_items[current_index], self.heap_items[parent_index]
+        self.heap_current_min = self.peek_min()[self.key]
+
+    def peek_min(self):
+        if self.heap_nitems == 0:
+            return None
+        return self.heap_items[0]
 
     def remove_min(self):
         if not self.heap_items:
@@ -59,16 +66,17 @@ class heap:
         while True:
             lchild_index = (parent_index << 1) + 1
             rchild_index = lchild_index + 1
-            if lchild_index[self.key] >= self.heap_nitems:
+            if lchild_index >= self.heap_nitems:
                 break
             min_index = lchild_index if rchild_index >= self.heap_nitems or \
                             self.heap_items[lchild_index][self.key] < \
                             self.heap_items[rchild_index][self.key] \
                             else rchild_index
             if self.heap_items[min_index][self.key] < self.heap_items[parent_index][self.key]:
-                self.heap_items[parent_index][self.key], self.heap_items[min_index][self.key] = \
-                        self.heap_items[min_index][self.key], self.heap_items[parent_index][self.key]
+                self.heap_items[parent_index], self.heap_items[min_index] = \
+                        self.heap_items[min_index], self.heap_items[parent_index]
                 parent_index = min_index
             else:
                 break
+        self.heap_current_min = self.peek_min()[self.key] if self.heap_nitems > 0 else None
         return min_item
