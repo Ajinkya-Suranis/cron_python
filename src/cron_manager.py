@@ -9,6 +9,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 import heap
+import exceptions
 
 SLEEP_TIME = 5
 
@@ -20,11 +21,10 @@ def loop_execute_jobs(args):
         if h.heap_nitems == 0:
             time.sleep(SLEEP_TIME)
             continue
-        #wait_time = min([h.heap_current_min - int(time.time()), SLEEP_TIME]) \
-            #if h.heap_current_min != None else SLEEP_TIME
-        wait_time = 0
-        with open("C:\cronfile.log", "a") as fp:
-            fp.write(str(wait_time))
+        with open("C:\\cronfile.log", "a") as fp:
+            fp.write(str(h.heap_nitems) + "\n")
+            fp.write(str(h.heap_current_min))
+        wait_time = h.heap_current_min - int(time.time())
         if wait_time > 0:
             time.sleep(wait_time)
             continue
@@ -35,7 +35,22 @@ def loop_execute_jobs(args):
             new_th.daemon = True
             # We really don't care about the exit status of thread.
             new_th.start()
-        # after the nearest task(s) are removed, take note of upcoming
+        # We need to recalculate the next run time of the tasks we just
+        # removed and reinsert them inside the heap.
+        for task in tasks["task_items"]:
+            cronobj = task["obj"]
+            cronobj.update_next_time()
+            # TODO: maintain a hash of epochs for this cron manager
+            # so that we don't need to search in the heap
+            cron = h.search_heap({"epoch": cronobj.next_time})
+            if cron:
+                cron["task_items"].append(task)
+            else:
+                new_cron_group = {}
+                new_cron_group["epoch"] = cronobj.next_time
+                new_cron_group["task_items"] = [task]
+                h.insert_heap(new_cron_group)
+        # after the nearest task(s) are updated, take note of upcoming
         # nearest ones and adjust the next wait time accordingly.
         wait_time = min([h.heap_current_min - int(time.time()), SLEEP_TIME]) \
             if h.heap_current_min != None else SLEEP_TIME
@@ -49,8 +64,7 @@ class cron_manager:
 
     def new_job(self, func, args=None, minutes=-1, hours=-1, dom=-1, months=-1):
         if not self.mgr_started:
-            print("Cron manager not started")
-            return None
+            raise exceptions.CronManagerNotStarted("The Cron manager wasn't started")
         if minutes == -1:
             minutes = list(range(1, 61))
         if hours == -1:
@@ -84,6 +98,8 @@ class cron_manager:
         return job_spec
 
     def start_cron(self):
+        if self.mgr_started:
+            raise exceptions.CronManagerAlreadyStarted("Cron Manager has already started")
         self.executor_tid = threading.Thread(target=loop_execute_jobs, args=[self.heap])
         self.executor_tid.daemon = True
         self.executor_tid.start()

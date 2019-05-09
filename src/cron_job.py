@@ -15,7 +15,7 @@ class cron_job:
         self.schedule_units["dom"] = dom
         self.schedule_units["months"] = months
         self.next_time = int(time.time())
-        self.next_time = self.get_next_time()
+        self.update_next_time()
 
     def _get_diff(self, unit_value):
         ltime = time.localtime(self.next_time)
@@ -43,11 +43,10 @@ class cron_job:
         else:
             return False, (max_val - val + self.schedule_units[unit_value][0]) * mult_factor
 
-    def get_next_time(self):
+    def update_next_time(self):
         self.next_time = self.next_time + 60
         for unit in self.schedule_units:
             done, diff = self._get_diff(unit)
             self.next_time += diff
             if done:
-                return self.next_time
-        return self.next_time
+                return

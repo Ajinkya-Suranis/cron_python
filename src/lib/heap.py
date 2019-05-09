@@ -30,6 +30,7 @@ class heap:
         if not self.heap_items:
             self.heap_items.append(new)
             self.heap_nitems = 1
+            self.heap_current_min = self.heap_items[0][self.key]
             return
         found = self.search_heap(new)
         if found:
