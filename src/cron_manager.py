@@ -21,9 +21,6 @@ def loop_execute_jobs(args):
         if h.heap_nitems == 0:
             time.sleep(SLEEP_TIME)
             continue
-        with open("C:\\cronfile.log", "a") as fp:
-            fp.write(str(h.heap_nitems) + "\n")
-            fp.write(str(h.heap_current_min))
         wait_time = h.heap_current_min - int(time.time())
         if wait_time > 0:
             time.sleep(wait_time)
@@ -50,11 +47,6 @@ def loop_execute_jobs(args):
                 new_cron_group["epoch"] = cronobj.next_time
                 new_cron_group["task_items"] = [task]
                 h.insert_heap(new_cron_group)
-        # after the nearest task(s) are updated, take note of upcoming
-        # nearest ones and adjust the next wait time accordingly.
-        wait_time = min([h.heap_current_min - int(time.time()), SLEEP_TIME]) \
-            if h.heap_current_min != None else SLEEP_TIME
-        time.sleep(wait_time)
 
 class cron_manager:
     def __init__(self):
