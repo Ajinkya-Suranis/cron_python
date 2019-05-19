@@ -89,6 +89,10 @@ class cron_manager:
         self.heap.insert_heap(new_cron_group)
         return job_spec
 
+    def remove_job(self, job_obj):
+        if type(job_obj) != 'cron_obj':
+            
+
     def start_cron(self):
         if self.mgr_started:
             raise exceptions.CronManagerAlreadyStarted("Cron Manager has already started")

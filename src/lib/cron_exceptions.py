@@ -3,3 +3,6 @@ class CronManagerNotStarted(Exception):
 
 class CronManagerAlreadyStarted(Exception):
     pass
+
+class HeapEmpty(Exception):
+    pass
