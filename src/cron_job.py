@@ -1,5 +1,8 @@
 import time
+import random
+import string
 
+CRON_UUID_NCHAR = 8
 days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 is_leap_year = lambda year: year % 400 == 0 or year % 4 == 0 and year % 100 != 0
 
@@ -8,7 +11,10 @@ def get_month_days(year, month):
                 else days_in_month[month - 1] + 1
 
 class cron_job:
-    def __init__(self, minutes, hours, dom, months):
+    def __init__(self, func, args, minutes, hours, dom, months):
+        self.function = func
+        self.args = args
+        self.job_uuid = self.generate_uuid()
         self.schedule_units = {}
         self.schedule_units["minutes"] = minutes
         self.schedule_units["hours"] = hours
@@ -16,6 +22,10 @@ class cron_job:
         self.schedule_units["months"] = months
         self.next_time = int(time.time())
         self.update_next_time()
+    
+    def generate_uuid(self):
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) \
+                        for _ in range(CRON_UUID_NCHAR))
 
     def _get_diff(self, unit_value):
         ltime = time.localtime(self.next_time)

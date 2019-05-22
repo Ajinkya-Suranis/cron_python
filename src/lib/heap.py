@@ -99,21 +99,28 @@ class heap:
     
     # When we remove a particular item from heap, it's not returned to
     # the caller, since the caller already knows its value.
-    def remove(self, value):
+    def remove(self, item):
         if not self.heap_items:
-            assert False, "The heap with uuid " + self.uuid + " is inconsistent"
+            assert False, "Attepmt to remove from empty heap with uuid " + self.uuid
         if self.heap_nitems == 1:
-            assert value == self.heap_items[0][self.key], "Key mismatch at the root of heap"
+            assert item[self.key] == self.heap_items[0][self.key], "Key mismatch at the root of heap"
             self.heap_items.pop()
+            self.heap_nitems = 0
             return
-        if value == self.heap_items[0][self.key]:
+        # If the item matches with root, then call self.remove_min()
+        # to remove and heapify the tree.
+        if item[self.key] == self.heap_items[0][self.key]:
             self.remove_min()
             return
-        cron_group, index = self.search_heap(value)
-        assert cron_group != None, "Expected cron group with key " + str(self.key) + " not found"
-        last_cron_group = self.heap_items.pop()
+        last_item = self.heap_items.pop()
         self.heap_nitems -= 1
-        self.heap_items[index] = last_cron_group
+        # If the last item in heap becomes a match, then simply remove it
+        # from heap and return.
+        if last_item[self.key] == item[self.key]:
+            return
+        check_item, index = self.search_heap(item)
+        assert check_item != None, "Expected heap item with key " + str(self.key) + " not found"
+        self.heap_items[index] = last_item
         pindex = (index >> 1) - 1 if index % 2 == 0 else index >> 1
         if self.heap_items[pindex][self.key] > self.heap_items[index][self.key]:
             while True:

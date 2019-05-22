@@ -6,3 +6,9 @@ class CronManagerAlreadyStarted(Exception):
 
 class HeapEmpty(Exception):
     pass
+
+class BadCronJob(Exception):
+    pass
+
+class CronjobNotFound(Exception):
+    pass
