@@ -16,16 +16,40 @@ class cron_job:
         self.args = args
         self.job_uuid = self.generate_uuid()
         self.schedule_units = {}
+        self._set_sched_units(minutes, hours, dom, months)
+        self.next_time = int(time.time())
+        self.update_next_time()
+
+    def _set_sched_units(self, minutes, hours, dom, months):
+        if minutes == -1:
+            minutes = list(range(0, 60))
+        if hours == -1:
+            hours = list(range(0, 24))
+        if dom == -1:
+            dom = list(range(1, 32))
+        if months == -1:
+            months = list(range(1, 13))
+        if not (type(minutes) == type(hours) == type(dom) == type(months) == list):
+            raise ValueError("time unit should be either -1 or of type list")
         self.schedule_units["minutes"] = minutes
         self.schedule_units["hours"] = hours
         self.schedule_units["dom"] = dom
         self.schedule_units["months"] = months
-        self.next_time = int(time.time())
-        self.update_next_time()
-    
+
     def generate_uuid(self):
         return ''.join(random.choice(string.ascii_uppercase + string.digits) \
                         for _ in range(CRON_UUID_NCHAR))
+
+    # Modify the schedule of job.
+    # We allow modification of the schedule units only,
+    # not other parameters like function, args.
+    # If they need to be modified then better
+    # create a new job.
+    # TODO: do this after taking an appropriate lock
+    def modify_schedule(self, minutes, hours, dom, months):
+        self._set_sched_units(minutes, hours, dom, months)
+        self.next_time = int(time.time())
+        self.update_next_time()
 
     def _get_diff(self, unit_value):
         ltime = time.localtime(self.next_time)

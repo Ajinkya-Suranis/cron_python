@@ -53,21 +53,10 @@ class cron_manager:
         self.heap = heap.heap("epoch")
         self.executor_tid = None
         self.mgr_started = False
-        self.job_dict = {}
 
     def new_job(self, func, args=None, minutes=-1, hours=-1, dom=-1, months=-1):
         if not self.mgr_started:
             raise CronManagerNotStarted("The Cron manager wasn't started")
-        if minutes == -1:
-            minutes = list(range(1, 61))
-        if hours == -1:
-            hours = list(range(1, 25))
-        if dom == -1:
-            dom = list(range(1, 32))
-        if months == -1:
-            months = list(range(1, 13))
-        if not (type(minutes) == type(hours) == type(dom) == type(months) == list):
-            raise ValueError("time unit should be either -1 or of type list")
         new_cron_job = cron_job(func, args, minutes, hours, dom, months)
         # TODO: Take a lock first before traversing and inserting into heap
         cron_group, _index = self.heap.search_heap({"epoch": new_cron_job.next_time})
@@ -75,21 +64,40 @@ class cron_manager:
             # The heap entry for the calculated epoch already exists.
             # We just need to add the new cron to the list.
             cron_group["task_items"].append(new_cron_job)
-            self.job_dict[new_cron_job.job_uuid] = cron_group
             return new_cron_job
         new_cron_group = {}
         new_cron_group["epoch"] = new_cron_job.next_time
         new_cron_group["task_items"] = [new_cron_job]
         self.heap.insert_heap(new_cron_group)
-        self.job_dict[new_cron_job.job_uuid] = new_cron_group
         return new_cron_job
+
+    def modify_job(self, job_obj, minutes=-1, hours=-1, dom=-1, months=-1):
+        if not isinstance(job_obj, cron_job):
+            raise BadCronJob("The cron job object isn't valid")
+        cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
+        assert "epoch" in cron_group, "The 'epoch' field must be present in cron group"
+        assert len(cron_group["task_items"]) > 0, "No task present in cron group"
+        cron_group["task_items"].remove(job_obj)
+        if len(cron_group["task_items"]) == 0:
+            # The cron group became empty after removing
+            # the job. Need to remove it from heap as well.
+            self.heap.remove(cron_group)
+        job_obj.modify_schedule(minutes, hours, dom, months)
+        cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
+        if cron_group:
+            # The heap entry for the calculated epoch already exists.
+            # We just need to add the new cron to the list.
+            cron_group["task_items"].append(job_obj)
+            return
+        new_cron_group = {}
+        new_cron_group["epoch"] = job_obj.next_time
+        new_cron_group["task_items"] = [job_obj]
+        self.heap.insert_heap(new_cron_group)
 
     def remove_job(self, job_obj):
         if not isinstance(job_obj, cron_job):
             raise BadCronJob("The cron job object isn't valid")
-        if job_obj.job_uuid not in self.job_dict:
-            raise CronjobNotFound("The cron job with uuid " + job_obj.job_uuid + " not present")
-        cron_group = self.job_dict[job_obj.job_uuid]
+        cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
         assert "epoch" in cron_group, "The 'epoch' field must be present in cron group"
         assert len(cron_group["task_items"]) > 0, "No task present in cron group"
         cron_group["task_items"].remove(job_obj)
@@ -98,8 +106,6 @@ class cron_manager:
         # then remove the group from heap.
         if len(cron_group["task_items"]) == 0:
             self.heap.remove(cron_group)
-        # remove the job uuid from the global dict of jobs
-        self.job_dict.pop(job_obj.job_uuid)
 
     def start_cron(self):
         if self.mgr_started:
