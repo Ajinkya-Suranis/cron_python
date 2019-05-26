@@ -11,16 +11,16 @@ def get_month_days(year, month):
                 else days_in_month[month - 1] + 1
 
 class cron_job:
-    def __init__(self, func, args, minutes, hours, dom, months):
+    def __init__(self, func, args, every_seconds, minutes, hours, dom, months):
         self.function = func
         self.args = args
         self.job_uuid = self.generate_uuid()
         self.schedule_units = {}
-        self._set_sched_units(minutes, hours, dom, months)
+        self._set_sched_units(every_seconds, minutes, hours, dom, months)
         self.next_time = int(time.time())
         self.update_next_time()
 
-    def _set_sched_units(self, minutes, hours, dom, months):
+    def _set_sched_units(self, every_seconds, minutes, hours, dom, months):
         if minutes == -1:
             minutes = list(range(0, 60))
         if hours == -1:
@@ -31,6 +31,7 @@ class cron_job:
             months = list(range(1, 13))
         if not (type(minutes) == type(hours) == type(dom) == type(months) == list):
             raise ValueError("time unit should be either -1 or of type list")
+        self.schedule_units["every_seconds"] = every_seconds
         self.schedule_units["minutes"] = minutes
         self.schedule_units["hours"] = hours
         self.schedule_units["dom"] = dom
@@ -46,8 +47,8 @@ class cron_job:
     # If they need to be modified then better
     # create a new job.
     # TODO: do this after taking an appropriate lock
-    def modify_schedule(self, minutes, hours, dom, months):
-        self._set_sched_units(minutes, hours, dom, months)
+    def modify_schedule(self, every_seconds, minutes, hours, dom, months):
+        self._set_sched_units(every_seconds, minutes, hours, dom, months)
         self.next_time = int(time.time())
         self.update_next_time()
 
@@ -78,9 +79,13 @@ class cron_job:
             return False, (max_val - val + self.schedule_units[unit_value][0]) * mult_factor
 
     def update_next_time(self):
-        self.next_time = self.next_time + 60
+        if self.schedule_units["every_seconds"] != None:
+            self.next_time = self.next_time + self.schedule_units["every_seconds"]
+        else:
+            self.next_time = self.next_time + 60
         for unit in self.schedule_units:
-            done, diff = self._get_diff(unit)
-            self.next_time += diff
-            if done:
-                return
+            if unit != "every_seconds":
+                done, diff = self._get_diff(unit)
+                self.next_time += diff
+                if done:
+                    return
