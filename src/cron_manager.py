@@ -28,23 +28,28 @@ def schedule_seconds_jobs(mgr_obj):
                 # The heap entry for the calculated epoch already exists.
                 # We just need to add the new cron to the list.
                 cron_group["task_items"].append(job_obj)
+                job_details["status"] = None
                 continue
             new_cron_group = {}
             new_cron_group["epoch"] = job_obj.next_time
             new_cron_group["task_items"] = [job_obj]
             mgr_obj.heap.insert_heap(new_cron_group)
-            job_details["status"] == None
+            job_details["status"] = None
+
 
 def loop_execute_jobs(mgr_obj):
     h = mgr_obj.heap
     wait_time = SLEEP_TIME
     while True:
+        schedule_seconds_jobs(mgr_obj)
         # TODO: Do all this checking and updating with lock
         if h.heap_nitems == 0:
             time.sleep(SLEEP_TIME)
             continue
         wait_time = h.heap_current_min - int(time.time())
         if wait_time > 0:
+            if wait_time > SLEEP_TIME:
+                wait_time = SLEEP_TIME
             time.sleep(wait_time)
             continue
         # time to execute the task(s)
@@ -77,7 +82,6 @@ def loop_execute_jobs(mgr_obj):
                 new_cron_group["epoch"] = cronobj.next_time
                 new_cron_group["task_items"] = [cronobj]
                 h.insert_heap(new_cron_group)
-        schedule_seconds_jobs(mgr_obj)
 
 
 def handle_seconds_job(mgr_obj, job_obj):
@@ -96,8 +100,6 @@ def handle_seconds_job(mgr_obj, job_obj):
             assert job_obj.job_uuid in mgr_obj.seconds_job_dict, "Job not found in dictionary"
             mgr_obj.seconds_job_dict[job_obj.job_uuid]["status"] = SEC_NEEDS_SCHEDULE
             return
-        with open("C:\\wait.txt", "a") as fp:
-            fp.write(str(job_obj.schedule_units["every_seconds"]) + "\n")
         time.sleep(job_obj.schedule_units["every_seconds"])
 
 
@@ -118,7 +120,6 @@ class cron_manager:
         # to the heap, depending on its next execution time.
         diff = new_cron_job.next_time - int(time.time())
         if diff < 60:
-            print("Creating a new thread for seconds job")
             self.seconds_job_dict[new_cron_job.job_uuid] = {"job_obj": new_cron_job, "status": None}
             sec_thread = threading.Thread(target=handle_seconds_job, args=[self, new_cron_job])
             sec_thread.daemon = True

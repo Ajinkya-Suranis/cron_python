@@ -17,7 +17,7 @@ class cron_job:
         self.job_uuid = self.generate_uuid()
         self.schedule_units = {}
         self._set_sched_units(every_seconds, minutes, hours, dom, months)
-        self.next_time = int(time.time())
+        self.next_time = int((time.time()/60)) * 60
         self.update_next_time()
 
     def _set_sched_units(self, every_seconds, minutes, hours, dom, months):
@@ -49,7 +49,7 @@ class cron_job:
     # TODO: do this after taking an appropriate lock
     def modify_schedule(self, every_seconds, minutes, hours, dom, months):
         self._set_sched_units(every_seconds, minutes, hours, dom, months)
-        self.next_time = int(time.time())
+        self.next_time = int(time.time()/60) * 60
         self.update_next_time()
 
     def _get_diff(self, unit_value):

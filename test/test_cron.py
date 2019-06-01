@@ -19,7 +19,7 @@ def keep_printing3(args1, args2):
 
 mgr = cron_manager.cron_manager()
 mgr.start_cron()
-j1 = mgr.new_job(keep_printing1, ['arg1', 'arg2'], minutes=-1)
+j1 = mgr.new_job(keep_printing1, ['arg1', 'arg2'], every_seconds=2, minutes=-1)
 j2 = mgr.new_job(keep_printing2, ['arg3', 'arg4'], minutes=-1)
 j3 = mgr.new_job(keep_printing3, ['arg5', 'arg6'], minutes=-1)
 
