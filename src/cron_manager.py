@@ -14,14 +14,21 @@ from cron_exceptions import *
 SLEEP_TIME = 5
 
 SEC_NEEDS_SCHEDULE = 1
-SEC_THR_EXIT = 2
-SEC_THR_PAUSE = 3
+SEC_CRON_REMOVE = 2
+SEC_CRON_PAUSE = 3
 
 def schedule_seconds_jobs(mgr_obj):
     if mgr_obj.seconds_job_dict == {}:
         return
-    for _job_uuid, job_details in mgr_obj.seconds_job_dict.items():
-        if job_details["status"] == SEC_NEEDS_SCHEDULE:
+    for job_uuid in list(mgr_obj.seconds_job_dict):
+        # If the job status is SEC_CRON_REMOVE, then the cron job is
+        # scheduled to be removed while it was waiting to be
+        # scheduled. Remove the job entry from global seconds dict.
+        # TODO: Do this removal inside a lock.
+        job_details = mgr_obj.seconds_job_dict[job_uuid]
+        if job_details["status"] == SEC_CRON_REMOVE:
+            mgr_obj.seconds_job_dict.pop(job_details["job_obj"].job_uuid)
+        elif job_details["status"] == SEC_NEEDS_SCHEDULE:
             job_obj = job_details["job_obj"]
             cron_group, _index = mgr_obj.heap.search_heap({"epoch": job_obj.next_time})
             if cron_group:
@@ -92,15 +99,15 @@ def handle_seconds_job(mgr_obj, job_obj):
         " value is None"
     while True:
 
-        # If the flag SEC_THR_EXIT is set, then job is planned to be removed.
+        # If the flag SEC_CRON_REMOVE is set, then job is planned to be removed.
         # Thread should exit in that case.
         # TODO: Do this checking and setting SEC_NEEDS_SCHEDULE inside a lock
         # (which is supposed to protect the 'seconds_job_dict' dictionary).
-        # Otherwise a race condition would occur where the SEC_THR_EXIT flag
+        # Otherwise a race condition would occur where the SEC_CRON_REMOVE flag
         # is overwritten by SEC_NEEDS_SCHEDULE and we'll completely miss the
         # cron job removal request!
 
-        if mgr_obj.seconds_job_dict[job_obj.job_uuid]["status"] == SEC_THR_EXIT:
+        if mgr_obj.seconds_job_dict[job_obj.job_uuid]["status"] == SEC_CRON_REMOVE:
             mgr_obj.seconds_job_dict.pop(job_obj.job_uuid)
             return
         job_thr = threading.Thread(target=job_obj.function, args=job_obj.args)
@@ -178,10 +185,10 @@ class cron_manager:
         if cron_group == None:
             # The cron job isn't present in the heap. It must be
             # present in the seconds jobs dict.
-            # TODO: Set the SEC_THR_EXIT inside a lock to avoid race condition.
+            # TODO: Set the SEC_CRON_REMOVE inside a lock to avoid race condition.
             assert job_obj.job_uuid in self.seconds_job_dict, "Cron job with uuid " + \
                 job_obj.job_uuid + " not found!"
-            self.seconds_job_dict[job_obj.job_uuid]["status"] = SEC_THR_EXIT
+            self.seconds_job_dict[job_obj.job_uuid]["status"] = SEC_CRON_REMOVE
             return
         cron_group["task_items"].remove(job_obj)
 
