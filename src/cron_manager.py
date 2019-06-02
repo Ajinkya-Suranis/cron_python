@@ -91,6 +91,18 @@ def handle_seconds_job(mgr_obj, job_obj):
     assert job_obj.schedule_units["every_seconds"] != None, "'every_seconds' parameter" \
         " value is None"
     while True:
+
+        # If the flag SEC_THR_EXIT is set, then job is planned to be removed.
+        # Thread should exit in that case.
+        # TODO: Do this checking and setting SEC_NEEDS_SCHEDULE inside a lock
+        # (which is supposed to protect the 'seconds_job_dict' dictionary).
+        # Otherwise a race condition would occur where the SEC_THR_EXIT flag
+        # is overwritten by SEC_NEEDS_SCHEDULE and we'll completely miss the
+        # cron job removal request!
+
+        if mgr_obj.seconds_job_dict[job_obj.job_uuid]["status"] == SEC_THR_EXIT:
+            mgr_obj.seconds_job_dict.pop(job_obj.job_uuid)
+            return
         job_thr = threading.Thread(target=job_obj.function, args=job_obj.args)
         job_thr.daemon = True
         job_thr.start()
@@ -142,8 +154,6 @@ class cron_manager:
         if not isinstance(job_obj, cron_job):
             raise BadCronJob("The cron job object isn't valid")
         cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
-        assert "epoch" in cron_group, "The 'epoch' field must be present in cron group"
-        assert len(cron_group["task_items"]) > 0, "No task present in cron group"
         cron_group["task_items"].remove(job_obj)
         if len(cron_group["task_items"]) == 0:
             # The cron group became empty after removing
@@ -165,8 +175,14 @@ class cron_manager:
         if not isinstance(job_obj, cron_job):
             raise BadCronJob("The cron job object isn't valid")
         cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
-        assert "epoch" in cron_group, "The 'epoch' field must be present in cron group"
-        assert len(cron_group["task_items"]) > 0, "No task present in cron group"
+        if cron_group == None:
+            # The cron job isn't present in the heap. It must be
+            # present in the seconds jobs dict.
+            # TODO: Set the SEC_THR_EXIT inside a lock to avoid race condition.
+            assert job_obj.job_uuid in self.seconds_job_dict, "Cron job with uuid " + \
+                job_obj.job_uuid + " not found!"
+            self.seconds_job_dict[job_obj.job_uuid]["status"] = SEC_THR_EXIT
+            return
         cron_group["task_items"].remove(job_obj)
 
         # If no cron jobs remain in the cron group after removal,
