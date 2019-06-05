@@ -11,7 +11,7 @@ def keep_printing1(args1, args2):
 
 def keep_printing2(args1, args2):
     with open("C:\\cron_logs2.log", "a") as fp:
-        fp.write(str(args1) + str(args2) + "\cmdn")
+        fp.write(str(args1) + str(args2) + "\n")
 
 def keep_printing3(args1, args2):
     with open("C:\\cron_logs3.log", "a") as fp:
