@@ -164,6 +164,10 @@ class cron_manager:
             cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
             assert cron_group != None, "Job not found in the heap"
             cron_group["task_items"].remove(job_obj)
+            if len(cron_group["task_items"]) == 0:
+                # The cron group became empty after removing
+                # the job. Need to remove it from heap as well.
+                self.heap.remove(cron_group)
             self.seconds_job_dict[job_obj.job_uuid]["state"] = SEC_CRON_RESCHEDULING
         job_obj.modify_schedule(every_seconds, minutes, hours, dom, months)
         wait_time = job_obj.next_time - int(time.time())
@@ -188,6 +192,10 @@ class cron_manager:
             cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
             assert cron_group != None, "Job not found in the heap"
             cron_group["task_items"].remove(job_obj)
+            if len(cron_group["task_items"]) == 0:
+                # The cron group became empty after removing
+                # the job. Need to remove it from heap as well.
+                self.heap.remove(cron_group)
         # Delete the dictionary entry corresponding to the current job.
         # TODO: Do this removal inside a lock.
         self.seconds_job_dict.pop(job_obj.job_uuid)
@@ -205,6 +213,55 @@ class cron_manager:
             self.heap.insert_heap(new_cron_group)
 
 
+    def _modify_from_nonsec(self, job_obj, every_seconds, minutes, hours, dom, months):
+        # First see whether we're converting from non-seconds to seconds or
+        # non-seconds to non-seconds.
+        assert job_obj.schedule_units["every_seconds"] == None, "_modify_from_nonsec: " \
+                                "Attempt to modify invalid job schedule"
+        cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
+        if cron_group == None:
+            raise CronjobNotFound("Cron job not found")
+        cron_group["task_items"].remove(job_obj)
+        if len(cron_group["task_items"]) == 0:
+            # The cron group became empty after removing
+            # the job. Need to remove it from heap as well.
+            self.heap.remove(cron_group)
+        job_obj.modify_schedule(every_seconds, minutes, hours, dom, months)
+        # If the modified job is non-seconds, it needs to be added to heap.
+        if every_seconds == None:
+            cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
+            if cron_group:
+                # The heap entry for the calculated epoch already exists.
+                # We just need to add the new cron to the list.
+                cron_group["task_items"].append(job_obj)
+            else:
+                new_cron_group = {}
+                new_cron_group["epoch"] = job_obj.next_time
+                new_cron_group["task_items"] = [job_obj]
+                self.heap.insert_heap(new_cron_group)
+        else:
+            # Converting from non-seconds to seconds!
+            # If the next run time is >=60 seconds away, then we
+            # weed to create a dictionary entry for modified job
+            # and set its status to SEC_CRON_NEEDS_SCHEDULE, so that
+            # the scheduler will pick it up.
+            # Otherwise, create the execution thread right away.
+            # TODO: Do this insertion within lock.
+            assert job_obj.job_uuid not in self.seconds_job_dict, \
+                        "Job found unexpectedly in seconds dictionary"
+            if job_obj.next_time - int(time.time()) < 60:
+                self.seconds_job_dict[job_obj.job_uuid] = \
+                        {"job_obj": job_obj, "status": SEC_CRON_RUNNING}
+                sec_thread = threading.Thread(target=handle_seconds_job, \
+                        args=[self, job_obj, job_obj.gen_count])
+                sec_thread.daemon = True
+                sec_thread.start()
+            else:
+                self.seconds_job_dict[job_obj.job_uuid] = \
+                            {"job_obj": job_obj, "status": SEC_CRON_NEEDS_SCHEDULE}
+            
+
+
     def modify_job(self, job_obj, every_seconds=None, minutes=-1, hours=-1, dom=-1, months=-1):
         if not isinstance(job_obj, cron_job):
             raise BadCronJob("The cron job object isn't valid")
@@ -216,7 +273,9 @@ class cron_manager:
             else:
                 # seconds to non-seconds!
                 self._modify_sec2nonsec(job_obj, minutes, hours, dom, months)
-            return
+        else:
+            # Converting the non-seconds job into seconds or non-seconds one.
+            self._modify_from_nonsec(job_obj, every_seconds, minutes, hours, dom, months)
         cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
         cron_group["task_items"].remove(job_obj)
         if len(cron_group["task_items"]) == 0:
