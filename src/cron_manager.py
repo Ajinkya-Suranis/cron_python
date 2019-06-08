@@ -138,6 +138,8 @@ class cron_manager:
     def __init__(self):
         self.heap = heap.heap("epoch")
         self.seconds_job_dict = {}
+        self.heap_lock = threading.Lock()
+        self.seconds_dict_lock = threading.Lock()
         self.executor_tid = None
         self.mgr_started = False
 
@@ -151,38 +153,42 @@ class cron_manager:
         # to the heap, depending on its next execution time.
         diff = new_cron_job.next_time - int(time.time())
         if every_seconds != None and diff < 60:
-            self.seconds_job_dict[new_cron_job.job_uuid] = \
-                        {"job_obj": new_cron_job, "state": SEC_CRON_RUNNING}
+            with self.seconds_dict_lock:
+                self.seconds_job_dict[new_cron_job.job_uuid] = \
+                            {"job_obj": new_cron_job, "state": SEC_CRON_RUNNING}
             sec_thread = threading.Thread(target=handle_seconds_job, \
                         args=[self, new_cron_job, new_cron_job.gen_count])
             sec_thread.daemon = True
             sec_thread.start()
             return new_cron_job
         # TODO: Take a lock first before traversing and inserting into heap
-        cron_group, _index = self.heap.search_heap({"epoch": new_cron_job.next_time})
-        if cron_group:
-            # The heap entry for the calculated epoch already exists.
-            # We just need to add the new cron to the list.
-            cron_group["task_items"].append(new_cron_job)
+        with self.heap_lock:
+            cron_group, _index = self.heap.search_heap({"epoch": new_cron_job.next_time})
+            if cron_group:
+                # The heap entry for the calculated epoch already exists.
+                # We just need to add the new cron to the list.
+                cron_group["task_items"].append(new_cron_job)
+                return new_cron_job
+            new_cron_group = {}
+            new_cron_group["epoch"] = new_cron_job.next_time
+            new_cron_group["task_items"] = [new_cron_job]
+            self.heap.insert_heap(new_cron_group)
             return new_cron_job
-        new_cron_group = {}
-        new_cron_group["epoch"] = new_cron_job.next_time
-        new_cron_group["task_items"] = [new_cron_job]
-        self.heap.insert_heap(new_cron_group)
-        return new_cron_job
 
 
     def _modify_sec2sec(self, job_obj, every_seconds, minutes, hours, dom, months):
         # First check the state of the job. If it's in scheduled state, it means
         # it's in the heap. We need to remove it from heap.
+        self.seconds_dict_lock.acquire()
         if self.seconds_job_dict[job_obj.job_uuid]["state"] == SEC_CRON_SCHEDULED:
-            cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
-            assert cron_group != None, "Job not found in the heap"
-            cron_group["task_items"].remove(job_obj)
-            if len(cron_group["task_items"]) == 0:
-                # The cron group became empty after removing
-                # the job. Need to remove it from heap as well.
-                self.heap.remove(cron_group)
+            with self.heap_lock:
+                cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
+                assert cron_group != None, "Job not found in the heap"
+                cron_group["task_items"].remove(job_obj)
+                if len(cron_group["task_items"]) == 0:
+                    # The cron group became empty after removing
+                    # the job. Need to remove it from heap as well.
+                    self.heap.remove(cron_group)
             self.seconds_job_dict[job_obj.job_uuid]["state"] = SEC_CRON_RESCHEDULING
         job_obj.modify_schedule(every_seconds, minutes, hours, dom, months)
         wait_time = job_obj.next_time - int(time.time())
@@ -190,7 +196,7 @@ class cron_manager:
             # The next run time of this modified cron job is less than
             # a minute away. Hence create a thread which would execute
             # the function iteratively.
-            self.seconds_job_dict[job_obj.job_uuid]["state"] = SEC_CRON_RUNNING
+            self.seconds_dict_lock.release()
             sec_thread = threading.Thread(target=handle_seconds_job, \
                         args=[self, job_obj, job_obj.gen_count])
             sec_thread.daemon = True
@@ -199,6 +205,7 @@ class cron_manager:
             # The time difference is more than 60 seconds. CHange the state
             # of task appropriately so that the scheduler will schedule it.
             self.seconds_job_dict[job_obj.job_uuid]["state"] = SEC_CRON_NEEDS_SCHEDULE
+            self.seconds_dict_lock.release()
 
 
     def _modify_sec2nonsec(self, job_obj, minutes, hours, dom, months):
@@ -290,23 +297,7 @@ class cron_manager:
         else:
             # Converting the non-seconds job into seconds or non-seconds one.
             self._modify_from_nonsec(job_obj, every_seconds, minutes, hours, dom, months)
-        cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
-        cron_group["task_items"].remove(job_obj)
-        if len(cron_group["task_items"]) == 0:
-            # The cron group became empty after removing
-            # the job. Need to remove it from heap as well.
-            self.heap.remove(cron_group)
-        job_obj.modify_schedule(every_seconds, minutes, hours, dom, months)
-        cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
-        if cron_group:
-            # The heap entry for the calculated epoch already exists.
-            # We just need to add the new cron to the list.
-            cron_group["task_items"].append(job_obj)
-            return
-        new_cron_group = {}
-        new_cron_group["epoch"] = job_obj.next_time
-        new_cron_group["task_items"] = [job_obj]
-        self.heap.insert_heap(new_cron_group)
+
 
     def remove_job(self, job_obj):
         if not isinstance(job_obj, cron_job):
