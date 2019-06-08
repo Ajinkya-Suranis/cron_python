@@ -94,7 +94,7 @@ def loop_execute_jobs(mgr_obj):
 def handle_seconds_job(mgr_obj, job_obj, gen_count):
     wait_time = job_obj.next_time - int(time.time())
     assert wait_time < 60, "The time difference should be" \
-        " less than 60 seconds"
+        " less than 60 seconds. It is " + str(wait_time)
     assert job_obj.schedule_units["every_seconds"] != None, "'every_seconds' parameter" \
         " value is None"
     # Set the cron job state to running.
@@ -102,10 +102,25 @@ def handle_seconds_job(mgr_obj, job_obj, gen_count):
     # state, check whether it's marked for removal. If so, we've nothing to do here..
     if not job_obj.job_uuid in mgr_obj.seconds_job_dict:
         return
+    # It is possible that between the time the the thread was created and
+    # the time it actually starts to execute a job, the request for
+    # modification of the same job was executed and hence job generation
+    # number would have changed. In this case, however rare, the current
+    # thread should just exit.
+    if job_obj.gen_count != gen_count:
+        return
     mgr_obj.seconds_job_dict[job_obj.job_uuid]["state"] = SEC_CRON_RUNNING
+    time.sleep(wait_time)
 
     while True:
         if not job_obj.job_uuid in mgr_obj.seconds_job_dict:
+            return
+        if job_obj.gen_count != gen_count:
+            # The cron job is modified. This thread should no longer
+            # continue executing the old schedule.
+            # TODO: Do the checking inside a lock.
+            with open("C:\\threxit.txt", "a") as fp:
+                fp.write("Thread Exiting due to change in gencount\n")
             return
         job_thr = threading.Thread(target=job_obj.function, args=job_obj.args)
         job_thr.daemon = True
@@ -135,7 +150,7 @@ class cron_manager:
         # is non-None), then either a thread is created for execution or it's added
         # to the heap, depending on its next execution time.
         diff = new_cron_job.next_time - int(time.time())
-        if diff < 60:
+        if every_seconds != None and diff < 60:
             self.seconds_job_dict[new_cron_job.job_uuid] = \
                         {"job_obj": new_cron_job, "state": SEC_CRON_RUNNING}
             sec_thread = threading.Thread(target=handle_seconds_job, \
@@ -218,6 +233,8 @@ class cron_manager:
         # non-seconds to non-seconds.
         assert job_obj.schedule_units["every_seconds"] == None, "_modify_from_nonsec: " \
                                 "Attempt to modify invalid job schedule"
+        assert job_obj.job_uuid not in self.seconds_job_dict, \
+                        "Job found unexpectedly in seconds dictionary"
         cron_group, _index = self.heap.search_heap({"epoch": job_obj.next_time})
         if cron_group == None:
             raise CronjobNotFound("Cron job not found")
@@ -247,8 +264,6 @@ class cron_manager:
             # the scheduler will pick it up.
             # Otherwise, create the execution thread right away.
             # TODO: Do this insertion within lock.
-            assert job_obj.job_uuid not in self.seconds_job_dict, \
-                        "Job found unexpectedly in seconds dictionary"
             if job_obj.next_time - int(time.time()) < 60:
                 self.seconds_job_dict[job_obj.job_uuid] = \
                         {"job_obj": job_obj, "status": SEC_CRON_RUNNING}
@@ -259,7 +274,6 @@ class cron_manager:
             else:
                 self.seconds_job_dict[job_obj.job_uuid] = \
                             {"job_obj": job_obj, "status": SEC_CRON_NEEDS_SCHEDULE}
-            
 
 
     def modify_job(self, job_obj, every_seconds=None, minutes=-1, hours=-1, dom=-1, months=-1):

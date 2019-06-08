@@ -17,9 +17,9 @@ class cron_job:
         self.job_uuid = self.generate_uuid()
         self.schedule_units = {}
         self._set_sched_units(every_seconds, minutes, hours, dom, months)
-        self.next_time = int((time.time()/60)) * 60
+        self.next_time = int(time.time()/60) * 60 if every_seconds == None else int(time.time())
         self.gen_count = 1
-        self.update_next_time()
+        self.update_next_time(adjust_seconds=True)
 
     def _set_sched_units(self, every_seconds, minutes, hours, dom, months):
         if minutes == -1:
@@ -50,9 +50,9 @@ class cron_job:
     # TODO: do this after taking an appropriate lock
     def modify_schedule(self, every_seconds, minutes, hours, dom, months):
         self._set_sched_units(every_seconds, minutes, hours, dom, months)
-        self.next_time = int(time.time()/60) * 60
+        self.next_time = int(time.time()/60) * 60 if every_seconds == None else int(time.time())
         self.gen_count += 1
-        self.update_next_time()
+        self.update_next_time(adjust_seconds=True)
 
     def _get_diff(self, unit_value):
         ltime = time.localtime(self.next_time)
@@ -80,14 +80,19 @@ class cron_job:
         else:
             return False, (max_val - val + self.schedule_units[unit_value][0]) * mult_factor
 
-    def update_next_time(self):
+    def update_next_time(self, adjust_seconds=False):
+        prev_next_time = self.next_time
         if self.schedule_units["every_seconds"] != None:
             self.next_time = self.next_time + self.schedule_units["every_seconds"]
         else:
             self.next_time = self.next_time + 60
+        extra_seconds = self.next_time - (int(self.next_time/60) * 60)
         for unit in self.schedule_units:
             if unit != "every_seconds":
                 done, diff = self._get_diff(unit)
                 self.next_time += diff
+                if self.schedule_units["every_seconds"] != None and unit == "minutes" \
+                            and self.next_time - prev_next_time >= 60 and adjust_seconds == True:
+                    self.next_time -= extra_seconds
                 if done:
                     return
