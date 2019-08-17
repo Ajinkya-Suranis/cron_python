@@ -165,9 +165,9 @@ class cron_manager:
             with self.seconds_dict_lock:
                 self.seconds_job_dict[new_cron_job.job_uuid] = \
                             {"job_obj": new_cron_job, "state": SEC_CRON_RUNNING}
-            sec_thread = threading.Thread(target=handle_seconds_job, \
-                        args=[self, new_cron_job, new_cron_job.gen_count])
-            sec_thread.daemon = True
+                sec_thread = threading.Thread(target=handle_seconds_job, \
+                            args=[self, new_cron_job, new_cron_job.gen_count])
+                sec_thread.daemon = True
             sec_thread.start()
             return new_cron_job
         # TODO: Take a lock first before traversing and inserting into heap

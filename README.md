@@ -34,7 +34,7 @@ Arguments:
                      Default value is -1, which is a special value meaning that the cron job is executed every day.
                      The list values should be in range [0, 31].
 
-'months'         :   Optional. It accepts argument of type list. It's the list of days of month values at which the cron job is                              executed.
+'months'         :   Optional. It accepts argument of type list. It's the list of days of month values at which the cron job is executed.
                      Default value is -1, which is a special value meaning that the cron job is executed every month.
                      The list values should be in range [0, 11]. (0-January, 11-December).
 
@@ -58,24 +58,18 @@ import cron_manager
 
 
 #Function to be passed to cron job.
-
 def keep_printing(args1, args2):
-
     with open("C:\\cron_logs.log", "a") as fp:
-
         fp.write(str(args1) + str(args2) + "\n")
-
 
 mgr = cron_manager.cron_manager()
 
 #Start the cron daemon.
-
 mgr.start_cron()
 
 #Create a cron job which gets executed every 2 seconds at minute values 1, 20 and 30 every hour.
-
 j1 = mgr.new_job(keep_printing, ['arg1', 'arg2'], every_seconds=2, minutes=[1, 20, 30])
 
 #Remove the job.
-
 mgr.remove_job(j1)
+
