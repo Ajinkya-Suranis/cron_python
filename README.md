@@ -15,6 +15,7 @@ Start the cron manager. It needs to be called immediately after creating the cro
 Arguments:
 
 'function'       :   Mandatory argument. Any python function can be specified.
+
 'args'           :   Mandatory argument. Arguments to the function. It should be provided as a list.
 'every_seconds'  :   Optional. Its value should be an integer. If it's specified, the cron job is executed every 'n' seconds
                      where 'n' is the value of argument. Default value is None.
