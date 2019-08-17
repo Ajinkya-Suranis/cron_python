@@ -6,10 +6,10 @@ It's methods are used to add, remove and modify the cron jobs.
 
 * cron_manager class methods:
 
-# 1) start_cron():
+1) start_cron():
 Start the cron manager. It needs to be called immediately after creating the cron_manager instance. It's a pre-requisite to all other functions.
 
-# 2) new_job(function, args[, every_seconds=None, minutes=-1, hours=-1, dom=-1, months=-1]):
+2) new_job(function, args[, every_seconds=None, minutes=-1, hours=-1, dom=-1, months=-1]):
    Add a new cron job.
 
 Arguments:
@@ -33,10 +33,10 @@ Arguments:
                      The list values should be in range [0, 11]. (0-January, 11-December).
 The return value is an object of type 'cron_obj'. This object needs to be passed to other functions (remove_job(), modify_job(), etc)
 
-# 3. remove_job(job_object):
+3. remove_job(job_object):
 Remove the cron job, passed as an argument.
 
-# 4. modify_job(job_object[, every_seconds=None, minutes=-1, hours=-1, dom=-1, months=-1]):
+4. modify_job(job_object[, every_seconds=None, minutes=-1, hours=-1, dom=-1, months=-1]):
    Modify the cron job pass as an argument. The optional arguments are same as that of new_job() function.
    
 Example:
